@@ -1,78 +1,78 @@
+#include "LSM6DS3.h"
+#include "Wire.h"
 #include <ArduinoBLE.h>
 
-BLEService sensorService("fff0"); // Custom Service UUID, use a unique UUID
+// 创建 IMU 设备实例
+LSM6DS3 myIMU(I2C_MODE, 0x6A);    // I2C 设备地址 0x6A
 
-// Define one characteristic for each sensor with a unique UUID
-BLEFloatCharacteristic sensor1Characteristic("2A6E", BLERead | BLENotify);
-BLEFloatCharacteristic sensor2Characteristic("2A6F", BLERead | BLENotify);
-BLEFloatCharacteristic sensor3Characteristic("2A70", BLERead | BLENotify);
-
-const uint8_t manufactData[4] = {0x01, 0x02, 0x03, 0x04};
-const uint8_t serviceData[3] = {0x00, 0x01, 0x02};
-
+// 定义 BLE 服务和特性
+BLEService imuService("fff0"); // 修正为唯一的服务 UUID
+BLECharacteristic imuCharacteristic("2A58", BLERead | BLENotify, 128); // IMU 数据特性 UUID
 
 void setup() {
-  Serial.begin(9600);
-  //while (!Serial);
+    Serial.begin(9600);
 
-  if (!BLE.begin()) {
-    Serial.println("Starting BLE failed!");
-    while (1);
-  }
+    // 初始化 IMU
+    if (myIMU.begin() != 0) {
+        Serial.println("IMU initialization failed!");
+        while (1); // 如果 IMU 初始化失败，停止程序
+    } else {
+        Serial.println("IMU Device OK!");
+    }
 
-  BLE.setLocalName("MultiSensor");
-  BLE.setAdvertisedService(sensorService);
-  
-  // Add characteristics to service
-  sensorService.addCharacteristic(sensor1Characteristic);
-  sensorService.addCharacteristic(sensor2Characteristic);
-  sensorService.addCharacteristic(sensor3Characteristic);
-  
-  // Add service
-  BLE.addService(sensorService);
-  
-  // Set initial value for each characteristic
-  sensor1Characteristic.writeValue(0.0f);
-  sensor2Characteristic.writeValue(0.0f);
-  sensor3Characteristic.writeValue(0.0f);
+    // 初始化 BLE
+    if (!BLE.begin()) {
+        Serial.println("Starting BLE failed!");
+        while (1); // 如果 BLE 初始化失败，停止程序
+    }
 
+    // 设置 BLE 广播名称
+    BLE.setLocalName("XIAO_IMU_BLE");
+    BLE.setAdvertisedService(imuService);
 
-  // Build scan response data packet
-  BLEAdvertisingData scanData;
-  // Set parameters for scan response packet
-  scanData.setLocalName("Test enhanced advertising");
-  // Copy set parameters in the actual scan response packet
-  BLE.setScanResponseData(scanData);
+    // 添加特性到服务
+    imuService.addCharacteristic(imuCharacteristic);
+    BLE.addService(imuService);
 
-
-
-  BLEAdvertisingData advData;
-  // Set parameters for advertising packet
-  advData.setManufacturerData(0x004C, manufactData, sizeof(manufactData));
-  advData.setAdvertisedService(sensorService);
-  advData.setAdvertisedServiceData(0xfff0, serviceData, sizeof(serviceData));
-  // Copy set parameters in the actual advertising packet
-  BLE.setAdvertisingData(advData);
-
-
-
-
-
-  BLE.advertise();
-  Serial.println("Bluetooth device active, waiting for connections...");
+    // 开始 BLE 广播
+    BLE.advertise();
+    Serial.println("Bluetooth device active, waiting for connections...");
 }
 
 void loop() {
-  // Simulate or read actual sensors
-  float sensor1Value = analogRead(A0) * (5.0 / 1023.0); // Convert to voltage
-  float sensor2Value = analogRead(A1) * (5.0 / 1023.0); 
-  float sensor3Value = analogRead(A2) * (5.0 / 1023.0); 
+    BLEDevice central = BLE.central(); // 检测是否有中央设备连接
 
-  // Update characteristics
-  sensor1Characteristic.writeValue(sensor1Value);
-  sensor2Characteristic.writeValue(sensor2Value);
-  sensor3Characteristic.writeValue(sensor3Value);
+    if (central) { // 如果有设备连接
+        Serial.print("Connected to central: ");
+        Serial.println(central.address());
 
-  //delay(1000); // Delay for demonstration purposes
-  BLE.poll();
+        while (central.connected()) { // 当设备保持连接时
+            // 获取 IMU 数据
+            float accelX = myIMU.readFloatAccelX();
+            float accelY = myIMU.readFloatAccelY();
+            float accelZ = myIMU.readFloatAccelZ();
+            float gyroX = myIMU.readFloatGyroX();
+            float gyroY = myIMU.readFloatGyroY();
+            float gyroZ = myIMU.readFloatGyroZ();
+
+            // 将 IMU 数据简化为字符串
+            String imuData = String(accelX, 4) + "," +
+                             String(accelY, 4) + "," +
+                             String(accelZ, 4) + "," +
+                             String(gyroX, 4) + "," +
+                             String(gyroY, 4) + "," +
+                             String(gyroZ, 4);
+
+            // 发送数据到 BLE 特性
+            imuCharacteristic.writeValue(imuData.c_str());
+
+            // 打印到串口（调试用）
+            Serial.println(imuData);
+
+            // 每 1 秒更新一次数据
+            delay(1000);
+        }
+
+        Serial.println("Disconnected from central.");
+    }
 }
