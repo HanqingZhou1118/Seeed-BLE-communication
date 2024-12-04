@@ -9,7 +9,7 @@ BLEFloatCharacteristic sensor3Characteristic("2A70", BLERead | BLENotify);
 
 void setup() {
   Serial.begin(9600);
-  while (!Serial);
+  //while (!Serial);
 
   if (!BLE.begin()) {
     Serial.println("Starting BLE failed!");
