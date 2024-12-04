@@ -26,3 +26,26 @@ async def main(address):
 
 if __name__ == "__main__":
     asyncio.run(main(address))
+
+
+
+
+import asyncio
+from bleak import BleakClient
+
+address = "your:device:mac:address"  # Use the correct MAC address
+sensor_uuids = ["2A6E", "2A6F", "2A70"]  # UUIDs for the sensor characteristics
+
+async def main(address):
+    async with BleakClient(address) as client:
+        isConnected = await client.is_connected()
+        print(f"Connected: {isConnected}")
+
+        for uuid in sensor_uuids:
+            value = await client.read_gatt_char(uuid)
+            # Assuming the value is a float stored as 4 bytes
+            sensor_value = float.fromhex(value.hex())
+            print(f"Sensor Value ({uuid}): {sensor_value}")
+
+if __name__ == "__main__":
+    asyncio.run(main(address))
