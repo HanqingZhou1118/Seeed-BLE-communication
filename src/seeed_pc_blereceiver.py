@@ -20,7 +20,7 @@ async def read_sensor_values(client):
         sensor_value = float.fromhex(value.hex())
 
         print(f"Sensor {sensor_uuid}: {sensor_value}")
-    await asyncio.sleep(1)
+    await asyncio.sleep(0.05)
 
 if __name__ == "__main__":
     asyncio.run(main(address))
